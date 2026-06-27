@@ -1,0 +1,255 @@
+\chapter{Annexes}
+\label{ch:annexes}
+
+\section{Annex A: Full Bill of Materials}
+\label{annex:bom}
+
+The full BOM with supplier links is provided in the accompanying spreadsheet file (\texttt{bom\_ssms.xlsx}). A condensed version was presented in Table~\ref{tab:bom}.
+
+\section{Annex B: Complete MicroPython Source Code}
+\label{annex:fw-code}
+
+The complete \texttt{main.py} firmware file is included below:
+
+\begin{lstlisting}[language=Python, caption=Complete MicroPython main.py, label=lst:fw-main]
+import network
+import time
+from machine import Pin
+from neopixel import NeoPixel
+from umqtt.simple import MQTTClient
+import json
+
+# Configuration
+LED_COUNT = 216
+LEDS_PER_BIN = 6
+NUM_BINS = 36
+MQTT_BROKER = "192.168.1.100"
+MQTT_TOPIC_CMD = b"ssms/command"
+MQTT_TOPIC_STATUS = b"ssms/status"
+WIFI_SSID = "SSMS_NET"
+WIFI_PASS = "ssms2025"
+
+# NeoPixel initialisation
+data_pin = Pin(18, Pin.OUT)
+np = NeoPixel(data_pin, LED_COUNT)
+
+# State variables
+current_state = "IDLE"
+blink_active = False
+blink_bin = 0
+blink_color = (0, 0, 255)
+blink_period = 500
+last_toggle = 0
+complete_start = 0
+
+def set_bin(bin_idx, color):
+    base = bin_idx * LEDS_PER_BIN
+    for i in range(LEDS_PER_BIN):
+        np[base + i] = color
+    np.write()
+
+def clear_bin(bin_idx):
+    set_bin(bin_idx, (0, 0, 0))
+
+def clear_all():
+    for i in range(LED_COUNT):
+        np[i] = (0, 0, 0)
+    np.write()
+
+def mqtt_callback(topic, msg):
+    global current_state, blink_active, blink_bin, blink_color, blink_period, complete_start
+    payload = msg.decode()
+    parts = payload.split(":")
+    cmd = parts[0]
+
+    if cmd == "LED_ON":
+        idx = int(parts[1])
+        r, g, b = int(parts[2]), int(parts[3]), int(parts[4])
+        set_bin(idx, (r, g, b))
+        current_state = "ACTIVE"
+        client.publish(MQTT_TOPIC_STATUS, f"OK:LED_ON:{idx}")
+    elif cmd == "LED_OFF":
+        idx = int(parts[1])
+        clear_bin(idx)
+        current_state = "IDLE"
+        client.publish(MQTT_TOPIC_STATUS, f"OK:LED_OFF:{idx}")
+    elif cmd == "ALL_OFF":
+        clear_all()
+        current_state = "IDLE"
+        blink_active = False
+        client.publish(MQTT_TOPIC_STATUS, "OK:ALL_OFF")
+    elif cmd == "ALL_ON":
+        r, g, b = int(parts[1]), int(parts[2]), int(parts[3])
+        for i in range(LED_COUNT):
+            np[i] = (r, g, b)
+        np.write()
+        client.publish(MQTT_TOPIC_STATUS, "OK:ALL_ON")
+    elif cmd == "BLINK":
+        blink_bin = int(parts[1])
+        blink_color = (int(parts[2]), int(parts[3]), int(parts[4]))
+        blink_period = int(parts[5])
+        blink_active = True
+        last_toggle = time.ticks_ms()
+        current_state = "SCANNING"
+        set_bin(blink_bin, blink_color)
+        client.publish(MQTT_TOPIC_STATUS, f"OK:BLINK:{blink_bin}")
+
+def connect_wifi():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    wlan.connect(WIFI_SSID, WIFI_PASS)
+    while not wlan.isconnected():
+        time.sleep(0.5)
+    print("WiFi connected:", wlan.ifconfig())
+
+def connect_mqtt():
+    global client
+    client = MQTTClient("ssms_esp32", MQTT_BROKER)
+    client.set_callback(mqtt_callback)
+    client.connect()
+    client.subscribe(MQTT_TOPIC_CMD)
+    print("MQTT connected")
+    client.publish(MQTT_TOPIC_STATUS, "ONLINE")
+
+connect_wifi()
+connect_mqtt()
+clear_all()
+
+while True:
+    try:
+        client.check_msg()
+
+        now = time.ticks_ms()
+        if blink_active and current_state == "SCANNING":
+            if now - last_toggle >= blink_period // 2:
+                last_toggle = now
+                base = blink_bin * LEDS_PER_BIN
+                if np[base] == (0, 0, 0):
+                    for i in range(LEDS_PER_BIN):
+                        np[base + i] = blink_color
+                else:
+                    for i in range(LEDS_PER_BIN):
+                        np[base + i] = (0, 0, 0)
+                np.write()
+        elif current_state == "COMPLETE":
+            if now - complete_start >= 2000:
+                clear_bin(blink_bin)
+                current_state = "IDLE"
+
+        time.sleep_ms(10)
+    except OSError:
+        time.sleep(5)
+        connect_mqtt()
+\end{lstlisting}
+
+\section{Annex C: Complete Desktop Application Source Code}
+\label{annex:app-code}
+
+The complete desktop application source code is too extensive to reproduce in full here. The file is provided as \texttt{ui\_main.py} in the project archive. Key excerpts are presented in Chapter~\ref{ch:implementation}.
+
+\section{Annex D: MQTT Topic and Command Reference}
+\label{annex:mqtt-ref}
+
+\begin{longtable}{p{3cm} p{3cm} p{6cm}}
+  \caption{MQTT command reference.}\label{tab:mqtt-ref}\\
+  \toprule
+  \textbf{Topic} & \textbf{Command} & \textbf{Description} \\
+  \midrule
+  \endfirsthead
+  \multicolumn{3}{c}{\tablename\ \thetable\ --- Continued} \\
+  \toprule
+  \textbf{Topic} & \textbf{Command} & \textbf{Description} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  \texttt{ssms/command} & \texttt{LED\_ON:idx:r:g:b} & Set bin at index to colour \\
+  \texttt{ssms/command} & \texttt{LED\_OFF:idx} & Turn off bin at index \\
+  \texttt{ssms/command} & \texttt{ALL\_ON:r:g:b} & Set all LEDs to colour \\
+  \texttt{ssms/command} & \texttt{ALL\_OFF} & Turn off all LEDs \\
+  \texttt{ssms/command} & \texttt{BLINK:idx:r:g:b:ms} & Blink bin at period \\
+  \texttt{ssms/status} & \texttt{OK:...} & Acknowledgment \\
+  \texttt{ssms/status} & \texttt{ONLINE} & ESP32 boot notification \\
+  \texttt{ssms/status} & \texttt{ERROR:msg} & Error message \\
+\end{longtable}
+
+\section{Annex E: KiCad Schematic}
+\label{annex:schematic}
+
+The full KiCad schematic is provided as a separate PDF file (\texttt{schematic\_ssms.pdf}).
+
+\textit{[Placeholder: Insert full-page KiCad schematic figure here]}
+
+\section{Annex F: LTspice Netlist}
+\label{annex:ltspice}
+
+\begin{lstlisting}[caption=LTspice netlist for level-shifter simulation, label=lst:ltspice]
+* Level Shifter Simulation: ESP32 GPIO -> 74HCT245 -> WS2813
+V1 GPIO_OUT 0 PULSE(0 3.3 0 5n 5n 500n 1.25u)
+XU1 A1 B1 VCC GND 74HCT245
+RB1 DATA_LINE 0 100
+C1 DATA_LINE 0 10p
+VCC VCC 0 5
+.tran 10u
+.end
+\end{lstlisting}
+
+\section{Annex G: Acronyms and Abbreviations}
+\label{annex:acronyms}
+
+\begin{longtable}{p{3cm} p{9cm}}
+  \caption{Acronyms and abbreviations.}\label{tab:acronyms}\\
+  \toprule
+  \textbf{Acronym} & \textbf{Full Form} \\
+  \midrule
+  \endfirsthead
+  \multicolumn{2}{c}{\tablename\ \thetable\ --- Continued} \\
+  \toprule
+  \textbf{Acronym} & \textbf{Full Form} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  BOM & Bill of Materials \\
+  CSV & Comma-Separated Values \\
+  EDA & Electronic Design Automation \\
+  ERP & Enterprise Resource Planning \\
+  ESP32 & Espressif Systems 32-bit MCU \\
+  GPIO & General-Purpose Input/Output \\
+  GUI & Graphical User Interface \\
+  I2C & Inter-Integrated Circuit \\
+  LAN & Local Area Network \\
+  LED & Light-Emitting Diode \\
+  MCU & Microcontroller Unit \\
+  MQTT & Message Queuing Telemetry Transport \\
+  MVC & Model-View-Controller \\
+  PCB & Printed Circuit Board \\
+  PFE & Projet de Fin d'\'Etudes \\
+  PSU & Power Supply Unit \\
+  PUT & Put-away (stocking) operation \\
+  QoS & Quality of Service \\
+  RFID & Radio-Frequency Identification \\
+  RTM & Requirements Traceability Matrix \\
+  SSMS & Smart Storage Management System \\
+  TVS & Transient Voltage Suppression \\
+  UART & Universal Asynchronous Receiver-Transmitter \\
+  WMS & Warehouse Management System \\
+\end{longtable}
+
+\section{Annex H: References}
+\label{annex:references}
+
+The complete list of references is provided in the bibliography section at the end of this document. Key references include:
+
+\begin{enumerate}
+  \item Hercog et al., ``Pick-to-Light Systems: A Review and Classification,'' \textit{Sensors}, vol. 22, no. 24, p. 9769, 2022. DOI: 10.3390/s22249769.
+  \item Espressif Systems, \textit{ESP32 Technical Reference Manual}, 2023.
+  \item Worldsemi, \textit{WS2813 Addressable RGB LED Datasheet}, 2019.
+  \item Texas Instruments, \textit{SN74HCT573 Octal Transparent D-Type Latch Datasheet}, 2022.
+  \item Hi-Link, \textit{HLK-PM01 AC-DC Power Module Datasheet}, 2020.
+  \item OASIS, \textit{MQTT Version 3.1.1}, 2014.
+  \item MicroPython, \textit{MicroPython Documentation}, 2023.
+  \item PyInstaller, \textit{PyInstaller Documentation}, 2023.
+  \item KiCad, \textit{KiCad EDA Documentation}, 2023.
+  \item G\"unter et al., ``Industry 4.0 in Warehousing: A Systematic Literature Review,'' \textit{Int. Journal of Production Research}, vol. 58, no. 10, pp. 2984--3010, 2020.
+\end{enumerate}

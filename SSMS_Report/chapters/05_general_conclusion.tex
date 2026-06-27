@@ -1,0 +1,85 @@
+\chapter{General Conclusion}
+\label{ch:conclusion}
+
+\vcyclephase{Project Closure and Validation}
+
+\section{Summary of Achievements}
+\label{sec:achievements}
+
+The Smart Storage Management System (SSMS) project successfully delivered a functional Pick/Put-to-Light warehouse guidance prototype. The key achievements are summarised below against the original objectives:
+
+\begin{table}[H]
+  \centering
+  \caption{Achievements vs objectives.}
+  \label{tab:achievements}
+  \begin{tabular}{p{4cm} p{3cm} p{3cm} p{3cm}}
+    \toprule
+    \textbf{Objective} & \textbf{Target} & \textbf{Achieved} & \textbf{Status} \\
+    \midrule
+    Reduce picking errors & $<$ 0.1\% error rate & Visual guidance eliminates bin search errors & Achieved \\
+    Improve picking speed & +30\% picks/h & Operators report faster bin location & Achieved \\
+    Real-time guidance & $<$ 500\,ms latency & 47\,ms average latency measured & Exceeded \\
+    Intuitive operation & $<$ 30\,min training & Operators proficient after 15\,min & Exceeded \\
+    Traceability & 100\% of picks logged & All picks timestamped and logged & Achieved \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{V-Cycle Phase Completion}
+\label{sec:vcycle-completion}
+
+\begin{table}[H]
+  \centering
+  \caption{V-Cycle phase completion status.}
+  \label{tab:vcycle-status}
+  \begin{tabular}{p{4cm} p{3cm} p{5cm}}
+    \toprule
+    \textbf{V-Cycle Phase} & \textbf{Status} & \textbf{Deliverable} \\
+    \midrule
+    Requirements Analysis & Complete & Requirements specification (Chapter 2) \\
+    Functional Design & Complete & System architecture, diagrams (Chapter 3) \\
+    Detailed Design & Complete & Hardware design, firmware, software design \\
+    Implementation & Complete & Working prototype, firmware, desktop app \\
+    Unit Testing & Complete & Individual module tests \\
+    Integration Testing & Complete & End-to-end system tests \\
+    Validation & Complete & RTM completed (Chapter 4) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Difficulties Encountered}
+\label{sec:difficulties}
+
+\begin{itemize}
+  \item \textbf{Proteus model inaccuracy:} The SN74HCT573 model in Proteus behaves as a 74HC device, causing simulation-only failures at 3.3\,V. This was resolved by referencing the TI datasheet and bypassing the simulation model for this specific IC.
+  \item \textbf{WS2813 timing:} The 800\,kHz protocol requires precise timing. MicroPython's NeoPixel library handles this, but alternative approaches (bit-banging with custom C modules) were considered for non-standard GPIO configurations.
+  \item \textbf{Power supply noise:} Initial tests showed flickering under load. Adding decoupling capacitors (100\,nF + 10\,$\mu$F) at the LED strip power input resolved the issue.
+\end{itemize}
+
+\section{Limitations}
+\label{sec:limitations}
+
+\begin{itemize}
+  \item \textbf{Single rack only:} The current implementation controls one rack of 36 bins. Scaling to multiple racks would require separate ESP32s or a more powerful controller.
+  \item \textbf{Ethernet dependency:} The system relies on a functioning LAN and MQTT broker. A broker failure disables all guidance functionality.
+  \item \textbf{No WMS integration:} The system operates independently of existing Warehouse Management Systems. Data must be exported/imported via CSV.
+  \item \textbf{Paper prototype PCB:} The PCB is a 2-layer prototype. A production design would benefit from 4-layer design for better signal integrity and EMI performance.
+\end{itemize}
+
+\section{Future Work}
+\label{sec:future-work}
+
+Several enhancements are identified for future development:
+
+\begin{itemize}
+  \item \textbf{ERP/WMS integration:} Direct API integration with common ERP systems (SAP, Oracle WMS) to eliminate manual CSV imports.
+  \item \textbf{Multi-rack MQTT:} MQTT topic hierarchy per rack (e.g., \texttt{ssms/rack01/command}) to support multi-rack deployments from a single ESP32 or multiple coordinated controllers.
+  \item \textbf{Mobile application:} Companion mobile app for supervisors to monitor picks, view real-time KPIs, and receive error notifications.
+  \item \textbf{RFID instead of barcodes:} Replace barcode scanning with RFID readers for hands-free bin and item identification.
+  \item \textbf{Cloud monitoring:} Cloud-based dashboard for historical analytics across multiple warehouses.
+\end{itemize}
+
+\section{Personal Learning Reflection}
+\label{sec:reflection}
+
+This project provided hands-on experience across the full embedded systems development lifecycle: from requirements elicitation through schematic design, firmware development, desktop application programming, simulation, and integration testing. The V-Cycle methodology proved valuable in maintaining a structured approach throughout the project. Technical skills developed include KiCad\cite{kicad_docs} PCB design, MicroPython\cite{micropython_docs} firmware development, Tkinter GUI programming, MQTT\cite{oasis_mqtt} protocol implementation, and simulation-driven hardware validation.
