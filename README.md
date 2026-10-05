@@ -47,7 +47,7 @@ This PFE work was carried out as part of academic requirements. Contributions fo
 
 ## Presentation
 
-Slides: [Presentation Link](https://canva.link/5g0c34b8jzndj8c)
+Slides: [Presentation Link](link)
 
 ## Full Report
 
